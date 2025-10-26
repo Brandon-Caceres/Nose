@@ -9,7 +9,7 @@ import com.badlogic.gdx.graphics.Color;
 public class Block {
     int x,y,width,height;
     Color cc;
-    boolean destroyed;
+    private boolean destroyed; // ahora es privado
     
     public Block(int x, int y, int width, int height) {
         this.x = x;
@@ -23,7 +23,16 @@ public class Block {
   
     }
     public void draw(ShapeRenderer shape){
+        if (destroyed) return; // no dibujar si ya está destruido
     	shape.setColor(cc);
         shape.rect(x, y, width, height);
+    }
+
+    // Encapsulamiento
+    public boolean isDestroyed() {
+        return destroyed;
+    }
+    public void destroy() {
+        destroyed = true;
     }
 }
