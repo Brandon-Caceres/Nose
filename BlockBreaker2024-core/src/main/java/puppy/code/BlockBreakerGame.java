@@ -56,8 +56,11 @@ public class BlockBreakerGame extends ApplicationAdapter {
     private boolean enableExtraBall = false;
     private boolean enableExplosiveBall = false;
     private boolean enablePowerDowns = false;
-    private boolean allowUnbreakables = false;
     private float toughBlocksRate = 0f;
+    private float unbreakableRate = 0f;
+
+    // Pause debounce flag
+    private boolean justEnteredPause = false;
 
     // Menú de pausa
     private final String[] pauseOptions = {
@@ -109,8 +112,8 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 enableExtraBall = false;
                 enableExplosiveBall = false;
                 enablePowerDowns = false;
-                allowUnbreakables = false;
                 toughBlocksRate = 0.0f;
+                unbreakableRate = 0.0f;
                 break;
 
             case MEDIUM:
@@ -132,8 +135,8 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 enableExtraBall = true;
                 enableExplosiveBall = true;
                 enablePowerDowns = false;
-                allowUnbreakables = false;
                 toughBlocksRate = 0.25f;
+                unbreakableRate = 0.0f;
                 break;
 
             case HARD:
@@ -155,8 +158,8 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 enableExtraBall = true;
                 enableExplosiveBall = true;
                 enablePowerDowns = true;
-                allowUnbreakables = true;
                 toughBlocksRate = 0.4f;
+                unbreakableRate = 0.15f;
                 break;
         }
     }
@@ -187,6 +190,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
     public void crearBloques(int filas) {
         blocks.clear();
+        java.util.Random rand = new java.util.Random(System.currentTimeMillis() + nivel);
 
         // Punto de partida vertical (alto de pantalla - margen superior)
         int y = (int)camera.viewportHeight - blockTopMargin;
@@ -209,7 +213,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
                 for (int c = 0; c < cols; c++) {
                     int x = startX + c * (bw + blockHSpacing);
-                    blocks.add(new Block(x, y, bw, bh));
+                    blocks.add(createBlock(x, y, bw, bh, rand));
                 }
             }
         } else {
@@ -229,10 +233,26 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
                 for (int c = 0; c < cols; c++) {
                     int x = startX + c * (bw + blockHSpacing);
-                    blocks.add(new Block(x, y, bw, bh));
+                    blocks.add(createBlock(x, y, bw, bh, rand));
                 }
             }
         }
+    }
+    
+    private Block createBlock(int x, int y, int width, int height, java.util.Random rand) {
+        // Check if block should be unbreakable
+        if (rand.nextFloat() < unbreakableRate) {
+            return new Block(x, y, width, height, 1, true);
+        }
+        
+        // Check if block should be tough (more HP)
+        if (rand.nextFloat() < toughBlocksRate) {
+            int hp = 2 + rand.nextInt(2); // 2 or 3 HP
+            return new Block(x, y, width, height, hp, false);
+        }
+        
+        // Regular block with 1 HP
+        return new Block(x, y, width, height, 1, false);
     }
 
     private void drawMenu() {
@@ -324,6 +344,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
         if (state == State.PLAYING && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             state = State.PAUSED;
             pauseSelected = 0;
+            justEnteredPause = true;
         }
 
         if (state == State.PLAYING) {
@@ -473,6 +494,19 @@ public class BlockBreakerGame extends ApplicationAdapter {
     }
 
     private void handlePauseInput() {
+        // Handle ESC to resume, but only if we didn't just enter pause
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (!justEnteredPause) {
+                state = State.PLAYING;
+                return;
+            }
+        }
+        
+        // Reset the flag once ESC is no longer pressed
+        if (justEnteredPause && !Gdx.input.isKeyPressed(Input.Keys.ESCAPE)) {
+            justEnteredPause = false;
+        }
+        
         if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             pauseSelected = (pauseSelected - 1 + pauseOptions.length) % pauseOptions.length;
         }

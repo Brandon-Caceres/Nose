@@ -4,34 +4,20 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Rectangle;
 
-public class Paddle {
-    private int x = 20;
-    private int y = 20;
-    private int width = 100;
-    private int height = 10;
-
-    // Velocidad en píxeles por segundo (ajústala para reducir la velocidad)
+public class Paddle extends GameObject implements Collidable {
     private float speedPixelsPerSecond = 200f;
 
     public Paddle(int x, int y, int ancho, int alto) {
-        this.x = x;
-        this.y = y;
-        width = ancho;
-        height = alto;
+        super(x, y, ancho, alto);
     }
 
-    // Setter para cambiar la velocidad desde el juego/dificultad
     public void setSpeedPixelsPerSecond(float speed) {
         this.speedPixelsPerSecond = speed;
     }
 
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
-
-    // Mueve la paleta usando delta time (suave y configurable)
+    @Override
     public void update() {
         float delta = Gdx.graphics.getDeltaTime();
         int newX = x;
@@ -49,8 +35,21 @@ public class Paddle {
         }
     }
 
+    @Override
     public void draw(ShapeRenderer shape) {
         shape.setColor(Color.BLUE);
         shape.rect(x, y, width, height);
+    }
+    
+    // Collidable interface implementation
+    @Override
+    public Rectangle getBounds() {
+        return new Rectangle(x, y, width, height);
+    }
+    
+    @Override
+    public void onHitByBall(PingBall ball) {
+        // Change ball color when it hits the paddle
+        ball.setColor(Color.GREEN);
     }
 }
