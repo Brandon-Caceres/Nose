@@ -8,26 +8,22 @@ public abstract class GameObject {
     protected int width;
     protected int height;
 
-    public GameObject(int x, int y, int width, int height){
+    public GameObject(int x, int y, int width, int height) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
     }
 
-    public int getX(){ return x; }
-    public int getY(){ return y; }
-    public int getWidth(){ return width; }
-    public int getHeight(){ return height; }
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
 
-    public void setPosition(int x, int y){
-        this.x = x;
-        this.y = y;
-    }
+    public void setPosition(int x, int y) { this.x = x; this.y = y; }
+    public void setSize(int width, int height) { this.width = width; this.height = height; }
 
-    public void update() {
-        // Por defecto, nada. Las subclases pueden sobrescribir.
-    }
+    public void update() {}
 
     public abstract void draw(ShapeRenderer shape);
 }

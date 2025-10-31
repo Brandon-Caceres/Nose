@@ -33,40 +33,34 @@ public class BlockBreakerGame extends ApplicationAdapter {
     private State state = State.MENU;
     private Difficulty difficulty = Difficulty.EASY;
 
-    // Parámetros por dificultad
+    // Difficulty params
     private int baseRows = 3;
     private int rowsPerLevelIncrement = 0;
     private int padBaseWidth = 120;
     private int currentBallXSpeed = 5;
     private int currentBallYSpeed = 7;
-    private float padSpeed = 200f; // píxeles por segundo (ajústalo a gusto)
+    private float padSpeed = 200f;
 
-    // Tamaño y espaciado de bloques (valores por defecto para MEDIUM/HARD)
+    // Block sizing defaults (MEDIUM/HARD)
     private int blockWidth = 70;
     private int blockHeight = 26;
     private int blockHSpacing = 10;
     private int blockVSpacing = 10;
-    private int blockMarginLR = 10;   // margen izquierdo/derecho
-    private int blockTopMargin = 10;  // margen superior
+    private int blockMarginLR = 10;
+    private int blockTopMargin = 10;
 
-    // Objetivo de columnas para tamaño dinámico EN FÁCIL
     private int easyTargetCols = 8;
 
-    // Hooks para próximas fases
-    private boolean enableExtraBall = false;
-    private boolean enableExplosiveBall = false;
-    private boolean enablePowerDowns = false;
-    private boolean allowUnbreakables = false;
+    // block type rates
     private float toughBlocksRate = 0f;
+    private float unbreakableRate = 0f;
+    private boolean allowUnbreakables = false;
 
-    // Menú de pausa
-    private final String[] pauseOptions = {
-        "Reanudar",
-        "Reiniciar nivel",
-        "Menu principal",
-        "Salir"
-    };
+    // pause/menu
+    private final String[] pauseOptions = { "Reanudar", "Reiniciar nivel", "Menu principal", "Salir" };
     private int pauseSelected = 0;
+    private boolean justEnteredPause = false;
+    private long lastPauseToggleMs = 0;
 
     @Override
     public void create () {
@@ -76,7 +70,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
         batch = new SpriteBatch();
         font = new BitmapFont();
-        font.getData().setScale(2.2f, 2.0f);
+        font.getData().setScale(2.0f, 2.0f);
         shape = new ShapeRenderer();
         layout = new GlyphLayout();
 
@@ -88,40 +82,43 @@ public class BlockBreakerGame extends ApplicationAdapter {
         blocks.clear();
     }
 
+    private boolean canTogglePause() {
+        long now = com.badlogic.gdx.utils.TimeUtils.millis();
+        if (now - lastPauseToggleMs < 200) return false;
+        lastPauseToggleMs = now;
+        return true;
+    }
+
     private void applyDifficulty(Difficulty d) {
         difficulty = d;
         switch (d) {
             case EASY:
-            	padBaseWidth = 160;
+                padBaseWidth = 160;
                 currentBallXSpeed = 2;
                 currentBallYSpeed = 3;
                 baseRows = 3;
                 rowsPerLevelIncrement = 0;
                 padSpeed = 700f;
 
-                // Fácil: tamaño dinámico en crearBloques()
                 easyTargetCols = 8;
                 blockHSpacing = 16;
                 blockVSpacing = 14;
                 blockMarginLR = 20;
                 blockTopMargin = 20;
 
-                enableExtraBall = false;
-                enableExplosiveBall = false;
-                enablePowerDowns = false;
-                allowUnbreakables = false;
                 toughBlocksRate = 0.0f;
+                unbreakableRate = 0.0f;
+                allowUnbreakables = false;
                 break;
 
             case MEDIUM:
-            	padBaseWidth = 110;
+                padBaseWidth = 110;
                 currentBallXSpeed = 4;
                 currentBallYSpeed = 5;
                 baseRows = 5;
                 rowsPerLevelIncrement = 1;
                 padSpeed = 1000f;
 
-                // Tamaño fijo tradicional para MEDIUM
                 blockWidth = 70;
                 blockHeight = 26;
                 blockHSpacing = 10;
@@ -129,22 +126,19 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 blockMarginLR = 10;
                 blockTopMargin = 10;
 
-                enableExtraBall = true;
-                enableExplosiveBall = true;
-                enablePowerDowns = false;
-                allowUnbreakables = false;
                 toughBlocksRate = 0.25f;
+                unbreakableRate = 0.0f;
+                allowUnbreakables = false;
                 break;
 
             case HARD:
-            	padBaseWidth = 90;
+                padBaseWidth = 90;
                 currentBallXSpeed = 5;
                 currentBallYSpeed = 6;
                 baseRows = 7;
                 rowsPerLevelIncrement = 2;
                 padSpeed = 1500f;
 
-                // Tamaño fijo tradicional para HARD
                 blockWidth = 70;
                 blockHeight = 26;
                 blockHSpacing = 10;
@@ -152,11 +146,9 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 blockMarginLR = 10;
                 blockTopMargin = 10;
 
-                enableExtraBall = true;
-                enableExplosiveBall = true;
-                enablePowerDowns = true;
+                toughBlocksRate = 0.40f;
+                unbreakableRate = 0.15f;
                 allowUnbreakables = true;
-                toughBlocksRate = 0.4f;
                 break;
         }
     }
@@ -171,7 +163,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
         ball = new PingBall(
             (int)(camera.viewportWidth/2f - 10),
-            (int)(pad.getY() + pad.getHeight() + 11),
+            pad.getY() + pad.getHeight() + 11,
             10,
             currentBallXSpeed,
             currentBallYSpeed,
@@ -187,12 +179,9 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
     public void crearBloques(int filas) {
         blocks.clear();
-
-        // Punto de partida vertical (alto de pantalla - margen superior)
         int y = (int)camera.viewportHeight - blockTopMargin;
 
         if (difficulty == Difficulty.EASY) {
-            // Tamaño dinámico en Fácil
             int cols = Math.max(3, easyTargetCols);
             float worldW = camera.viewportWidth;
 
@@ -213,7 +202,6 @@ public class BlockBreakerGame extends ApplicationAdapter {
                 }
             }
         } else {
-            // Centrar filas con ancho de bloque fijo en MEDIUM/HARD
             int bw = blockWidth;
             int bh = blockHeight;
             float worldW = camera.viewportWidth;
@@ -229,7 +217,20 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
                 for (int c = 0; c < cols; c++) {
                     int x = startX + c * (bw + blockHSpacing);
-                    blocks.add(new Block(x, y, bw, bh));
+
+                    boolean makeUnbreakable = allowUnbreakables && Math.random() < unbreakableRate;
+                    boolean makeTough = !makeUnbreakable && Math.random() < toughBlocksRate;
+
+                    if (makeUnbreakable) {
+                        blocks.add(new Block(x, y, bw, bh, 1, true));
+                    } else if (makeTough) {
+                        int hp = (difficulty == Difficulty.HARD)
+                                ? (Math.random() < 0.5 ? 3 : 2)
+                                : 2;
+                        blocks.add(new Block(x, y, bw, bh, hp, false));
+                    } else {
+                        blocks.add(new Block(x, y, bw, bh));
+                    }
                 }
             }
         }
@@ -245,10 +246,10 @@ public class BlockBreakerGame extends ApplicationAdapter {
 
         String title = "BLOCKBREAKER 2024";
         String subtitle = "Elige dificultad:";
-        String opt1 = "1 (F1) - FACIL";
-        String opt2 = "2 (F2) - MEDIA";
-        String opt3 = "3 (F3) - DIFICIL";
-        String controls = "Controles: LEFT/RIGHT para mover, SPACE para lanzar la bola";
+        String opt1 = "1 (F1) - FACIL   | Paleta grande, bola lenta";
+        String opt2 = "2 (F2) - MEDIA   | Mas bloques, duros";
+        String opt3 = "3 (F3) - DIFICIL | Mas bloques, duros e irrompibles";
+        String controls = "Controles: LEFT/RIGHT, SPACE lanzar, ESC pausa";
 
         float y = worldH - 60;
         float line = 48f;
@@ -320,38 +321,35 @@ public class BlockBreakerGame extends ApplicationAdapter {
             return;
         }
 
-        // Toggle pausa desde PLAYING
-        if (state == State.PLAYING && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        // Toggle pause from PLAYING
+        if (state == State.PLAYING && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) && canTogglePause()) {
             state = State.PAUSED;
             pauseSelected = 0;
+            justEnteredPause = true;
         }
 
         if (state == State.PLAYING) {
-            renderGameFrame(true);   // actualizar y dibujar
+            renderGameFrame(true);
             return;
         }
 
         if (state == State.PAUSED) {
-            renderGameFrame(false);  // solo dibujar, sin actualizar
+            renderGameFrame(false);
             drawPauseOverlayAndMenu();
             handlePauseInput();
             return;
         }
     }
 
-    // Dibuja un frame del juego; si updating=false, no actualiza lógica ni colisiones
     private void renderGameFrame(boolean updating) {
         camera.update();
         shape.setProjectionMatrix(camera.combined);
 
-        if (updating) {
-            pad.update();
-        }
+        if (updating) pad.update();
 
         shape.begin(ShapeRenderer.ShapeType.Filled);
         pad.draw(shape);
 
-        // Bola: posición atada a la paleta cuando está quieta
         if (ball.estaQuieto()) {
             ball.setXY(pad.getX() + pad.getWidth()/2 - 5, pad.getY() + pad.getHeight() + 11);
             if (updating && Gdx.input.isKeyPressed(Input.Keys.SPACE)) ball.setEstaQuieto(false);
@@ -359,7 +357,6 @@ public class BlockBreakerGame extends ApplicationAdapter {
             ball.update();
         }
 
-        // Caída de la bola
         if (updating && ball.getY() < 0) {
             vidas--;
             ball = new PingBall(
@@ -372,7 +369,6 @@ public class BlockBreakerGame extends ApplicationAdapter {
             );
         }
 
-        // Game Over -> volver a menú
         if (updating && vidas <= 0) {
             state = State.MENU;
             blocks.clear();
@@ -380,14 +376,12 @@ public class BlockBreakerGame extends ApplicationAdapter {
             return;
         }
 
-        // Bloques y colisiones
         for (Block b : blocks) {
             b.draw(shape);
-            if (updating) ball.checkCollision(b);
+            if (updating) ball.checkCollision((Collidable)b);
         }
 
         if (updating) {
-            // Remover bloques destruidos y sumar puntaje
             for (int i = 0; i < blocks.size(); i++) {
                 Block b = blocks.get(i);
                 if (b.isDestroyed()) {
@@ -398,17 +392,14 @@ public class BlockBreakerGame extends ApplicationAdapter {
             }
         }
 
-        // Colisión con paleta y dibujado de bola
-        if (updating) ball.checkCollision(pad);
+        if (updating) ball.checkCollision((Collidable)pad);
         ball.draw(shape);
 
         shape.end();
         dibujaTextos();
 
-        // Nivel completado
         if (updating && blocks.size() == 0) {
             nivel++;
-
             if (difficulty == Difficulty.MEDIUM) {
                 currentBallXSpeed += (currentBallXSpeed > 0 ? 1 : -1);
                 currentBallYSpeed += (currentBallYSpeed > 0 ? 1 : -1);
@@ -436,7 +427,6 @@ public class BlockBreakerGame extends ApplicationAdapter {
     }
 
     private void drawPauseOverlayAndMenu() {
-        // Overlay semitransparente
         Gdx.gl.glEnable(GL20.GL_BLEND);
         shape.setProjectionMatrix(camera.combined);
         shape.begin(ShapeRenderer.ShapeType.Filled);
@@ -445,7 +435,6 @@ public class BlockBreakerGame extends ApplicationAdapter {
         shape.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
-        // Texto del menú de pausa
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         float w = camera.viewportWidth;
@@ -465,7 +454,7 @@ public class BlockBreakerGame extends ApplicationAdapter {
             y -= line;
         }
 
-        String hint = "ENTER: Aceptar  |  UP/DOWN: Navegar";
+        String hint = "ESC: Reanudar  |  ENTER: Aceptar  |  UP/DOWN: Navegar";
         layout.setText(font, hint);
         font.draw(batch, hint, (w - layout.width) / 2f, 120);
 
@@ -473,6 +462,16 @@ public class BlockBreakerGame extends ApplicationAdapter {
     }
 
     private void handlePauseInput() {
+        if (justEnteredPause) {
+            // consume the ESC that triggered pause
+            justEnteredPause = false;
+            return;
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) && canTogglePause()) {
+            state = State.PLAYING;
+            return;
+        }
         if (Gdx.input.isKeyJustPressed(Input.Keys.UP)) {
             pauseSelected = (pauseSelected - 1 + pauseOptions.length) % pauseOptions.length;
         }
@@ -481,11 +480,10 @@ public class BlockBreakerGame extends ApplicationAdapter {
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
             switch (pauseSelected) {
-                case 0: // Reanudar
+                case 0:
                     state = State.PLAYING;
                     break;
-                case 1: // Reiniciar nivel
-                    // Reinicia los bloques y la bola, conserva dificultad y nivel actual
+                case 1:
                     crearBloques(filasParaNivel(nivel));
                     ball = new PingBall(
                         pad.getX() + pad.getWidth()/2 - 5,
@@ -497,11 +495,11 @@ public class BlockBreakerGame extends ApplicationAdapter {
                     );
                     state = State.PLAYING;
                     break;
-                case 2: // Menu principal
+                case 2:
                     state = State.MENU;
                     blocks.clear();
                     break;
-                case 3: // Salir
+                case 3:
                     Gdx.app.exit();
                     break;
             }

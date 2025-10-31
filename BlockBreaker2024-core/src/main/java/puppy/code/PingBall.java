@@ -3,10 +3,9 @@ package puppy.code;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Rectangle;
 
-public class PingBall {
-    private int x;
-    private int y;
+public class PingBall extends GameObject {
     private int size;
     private int xSpeed;
     private int ySpeed;
@@ -14,74 +13,66 @@ public class PingBall {
     private boolean estaQuieto;
 
     public PingBall(int x, int y, int size, int xSpeed, int ySpeed, boolean iniciaQuieto) {
-        this.x = x;
-        this.y = y;
+        super(x, y, size * 2, size * 2);
         this.size = size;
         this.xSpeed = xSpeed;
         this.ySpeed = ySpeed;
         this.estaQuieto = iniciaQuieto;
     }
 
-    // Setter para permitir que otras clases cambien el color (p. ej., Paddle)
-    public void setColor(Color c) {
-        this.color = c;
-    }
-
     public boolean estaQuieto() { return estaQuieto; }
     public void setEstaQuieto(boolean b) { estaQuieto = b; }
-    public void setXY(int x, int y) { this.x = x; this.y = y; }
+    public void setXY(int nx, int ny) { this.x = nx; this.y = ny; }
     public int getY() { return y; }
 
-    public void draw(ShapeRenderer shape){
+    public void setColor(Color c) { this.color = c; }
+
+    @Override
+    public void draw(ShapeRenderer shape) {
         shape.setColor(color);
         shape.circle(x, y, size);
     }
 
+    @Override
     public void update() {
         if (estaQuieto) return;
         x += xSpeed;
         y += ySpeed;
-        if (x - size < 0 || x + size > Gdx.graphics.getWidth()) {
+        if (x - size < 0) {
+            x = size;
+            xSpeed = -xSpeed;
+        } else if (x + size > Gdx.graphics.getWidth()) {
+            x = Gdx.graphics.getWidth() - size;
             xSpeed = -xSpeed;
         }
         if (y + size > Gdx.graphics.getHeight()) {
+            y = Gdx.graphics.getHeight() - size;
             ySpeed = -ySpeed;
         }
     }
 
-    public void checkCollision(Paddle paddle) {
-        if (collidesWith(paddle)) {
-            color = Color.GREEN;    // feedback por defecto si no cambias desde Paddle
+    private boolean collidesWith(Rectangle r) {
+        float closestX = clamp(x, r.x, r.x + r.width);
+        float closestY = clamp(y, r.y, r.y + r.height);
+        float dx = x - closestX;
+        float dy = y - closestY;
+        return (dx * dx + dy * dy) <= (size * size);
+    }
+
+    private float clamp(float v, float a, float b) {
+        if (v < a) return a;
+        if (v > b) return b;
+        return v;
+    }
+
+    public void checkCollision(Collidable c) {
+        Rectangle r = c.getBounds();
+        if (collidesWith(r)) {
             ySpeed = -ySpeed;
-        } else {
-            color = Color.WHITE;
+            c.onHitByBall(this);
         }
     }
 
-    private boolean collidesWith(Paddle pp) {
-        boolean intersectaX = (pp.getX() + pp.getWidth() >= x - size) && (pp.getX() <= x + size);
-        boolean intersectaY = (pp.getY() + pp.getHeight() >= y - size) && (pp.getY() <= y + size);
-        return intersectaX && intersectaY;
-    }
-
-    public void checkCollision(Block block) {
-        if (collidesWith(block)) {
-            ySpeed = -ySpeed;
-            // Si encapsulaste Block, usa block.destroy(); si no, deja como estaba
-            try {
-                block.getClass().getMethod("destroy"); // solo para sugerir en texto
-                block.destroy();
-            } catch (Exception e) {
-                // fallback si no tienes destroy(): block.destroyed = true;
-                // Pero lo ideal es tener destroy() e isDestroyed() en Block.
-                block.destroy(); // asume que ya lo implementaste
-            }
-        }
-    }
-
-    private boolean collidesWith(Block bb) {
-        boolean intersectaX = (bb.x + bb.width >= x - size) && (bb.x <= x + size);
-        boolean intersectaY = (bb.y + bb.height >= y - size) && (bb.y <= y + size);
-        return intersectaX && intersectaY;
-    }
+    public void checkCollision(Paddle p) { checkCollision((Collidable)p); }
+    public void checkCollision(Block b) { checkCollision((Collidable)b); }
 }
