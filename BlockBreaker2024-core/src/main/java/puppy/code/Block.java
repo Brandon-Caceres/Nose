@@ -30,7 +30,16 @@ public class Block extends GameObject implements Collidable {
         this.unbreakable = unbreakable;
         Random r = new Random(x+y);
         
-        cc = new Color(0.1f + (r.nextFloat() * 0.9f), r.nextFloat(), r.nextFloat(), 1.0f);
+        if (unbreakable) {
+            // Unbreakable blocks are dark gray
+            cc = new Color(0.3f, 0.3f, 0.3f, 1.0f);
+        } else if (hp > 1) {
+            // Tough blocks are darker/more saturated colors
+            cc = new Color(0.6f + (r.nextFloat() * 0.4f), 0.2f + (r.nextFloat() * 0.3f), 0.2f + (r.nextFloat() * 0.3f), 1.0f);
+        } else {
+            // Regular blocks
+            cc = new Color(0.1f + (r.nextFloat() * 0.9f), r.nextFloat(), r.nextFloat(), 1.0f);
+        }
     }
     
     @Override
